@@ -1,58 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
+import { STORAGE_KEY, addReminder as addTo, deleteReminder, nextOpen, openCount, parseReminders, readableWhen, serializeReminders, sortByWhen, toggleDone } from "@/lib/reminders";
+import { createLocalStore, useLocalStore } from "@/lib/local-store";
 
-type Reminder = { id: string; text: string; when: string; done: boolean };
-
-const STARTER: Reminder[] = [
-  { id: "1", text: "Ship portfolio batch", when: "2026-08-24T09:00", done: false },
-  { id: "2", text: "Review the next route", when: "2026-08-24T14:30", done: false },
-  { id: "3", text: "Archive loose notes", when: "2026-08-25T10:00", done: true },
-];
-
-function useLocalStorage<T>(key: string, initial: T) {
-  const [value, setValue] = useState<T>(initial);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved) setValue(JSON.parse(saved) as T);
-    } catch {
-      // Keep the sample list usable when browser storage is unavailable.
-    }
-    setReady(true);
-  }, [key]);
-
-  useEffect(() => {
-    if (ready) localStorage.setItem(key, JSON.stringify(value));
-  }, [key, ready, value]);
-
-  return [value, setValue] as const;
-}
-
-function readableWhen(value: string) {
-  const pieces = value.split("T");
-  return pieces[0].replaceAll("-", ".") + " / " + (pieces[1] || "00:00");
-}
+const store = createLocalStore(STORAGE_KEY, parseReminders, serializeReminders);
 
 export default function Home() {
-  const [items, setItems] = useLocalStorage<Reminder[]>("reminders-v1", STARTER);
+  const items = useLocalStore(store);
+  const setItems = store.set;
   const [text, setText] = useState("");
   const [when, setWhen] = useState("2026-08-24T16:00");
-  const ordered = useMemo(
-    () => [...items].sort((a, b) => a.when.localeCompare(b.when)),
-    [items],
-  );
-  const next = ordered.find((item) => !item.done);
+  const ordered = useMemo(() => sortByWhen(items), [items]);
+  const next = nextOpen(items);
 
   function addReminder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!text.trim()) return;
-    setItems((current) => [
-      { id: crypto.randomUUID(), text: text.trim(), when, done: false },
-      ...current,
-    ]);
+    if (!text.trim() || !when) return;
+    setItems((current) => addTo(current, text, when, () => crypto.randomUUID()));
     setText("");
   }
 
@@ -92,7 +57,7 @@ export default function Home() {
         <section className="tide-dock">
           <div className="tide-section-head">
             <span className="tide-index">A / MARK</span>
-            <span>{items.filter((item) => !item.done).length} open reminders</span>
+            <span>{openCount(items)} open reminders</span>
           </div>
           <h2>Set the next mark.</h2>
           <form className="tide-form" onSubmit={addReminder}>
@@ -106,7 +71,7 @@ export default function Home() {
             </label>
             <label>
               <span>WHEN</span>
-              <input type="datetime-local" value={when} onChange={(event) => setWhen(event.target.value)} />
+              <input type="datetime-local" required value={when} onChange={(event) => setWhen(event.target.value)} />
             </label>
             <button type="submit">Set reminder</button>
           </form>
@@ -135,13 +100,7 @@ export default function Home() {
                   <input
                     type="checkbox"
                     checked={item.done}
-                    onChange={() =>
-                      setItems((current) =>
-                        current.map((value) =>
-                          value.id === item.id ? { ...value, done: !value.done } : value,
-                        ),
-                      )
-                    }
+                    onChange={() => setItems((current) => toggleDone(current, item.id))}
                     aria-label={"Complete " + item.text}
                   />
                   <span>{item.done ? "LOGGED" : "OPEN"}</span>
@@ -149,8 +108,8 @@ export default function Home() {
                 <button
                   className="tide-delete"
                   type="button"
-                  onClick={() => setItems((current) => current.filter((value) => value.id !== item.id))}
-                  aria-label={"Delete " + item.text}
+                  onClick={() => setItems((current) => deleteReminder(current, item.id))}
+                  aria-label={"Clear " + item.text}
                 >
                   Clear
                 </button>

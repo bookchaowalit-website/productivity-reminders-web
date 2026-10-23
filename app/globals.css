@@ -28,6 +28,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--coral); out
 .tide-dock { background: var(--deep-soft); border-bottom: 1px solid var(--line); }
 .tide-section-head { margin-bottom: 22px; color: var(--muted); font-family: var(--font-geist-mono), monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
 .tide-index { color: var(--coral); font-weight: 700; }
+.tide-dock .tide-index { color: #f39a87; }
 .tide-dock h2, .tide-list h2 { margin: 0 0 24px; color: var(--sand); font-family: Georgia, serif; font-size: 31px; font-weight: 400; }
 .tide-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, 0.45fr) auto; align-items: end; gap: 12px; }
 .tide-form label { display: grid; gap: 8px; }
