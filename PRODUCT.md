@@ -1,54 +1,46 @@
-# bookchaowalit-reminders-frontend — Product brief
+# Reminders — Product truth
 
-**Slug:** `bookchaowalit-website/bookchaowalit-reminders-frontend`  
-**Generated:** 2026-08-11 (bulk Book Dev closeout)  
-**Status:** starter / portfolio boundary
+> Inferred from the code and copy (no user interview). Checked against the portfolio card claims review
+> (`portfolio-site-web/docs/audits/CARD-CLAIMS-REVIEW-2026-10.md`, row `reminders`, evidence Prototype) on 2026-10-23.
 
-## Purpose
+## What it is
 
-Portfolio repository under Book Dev. This brief records ownership and the
-current honest status so the nested tree is not an empty shell in the task
-system.
+A client-only list of dated reminders, styled as a tideboard. Reminders live in this browser's localStorage
+(key `reminders-v1`). It shows reminders; it never alerts.
 
-## Runnable path
+## Who it is for
 
-See `README.md` for install and run instructions when present.
+A portfolio visitor, or one person in one browser, who wants a short list of things to keep in view.
 
-## Limits
+## What works today
 
-- Not claimed as production-ready unless README and tests prove it.
-- Mobile smoke / emulator acceptance is separate and toolchain-dependent.
+1. Add a reminder with a message and a date/time (blank messages and a cleared date are refused).
+2. The list is ordered by time; "NEXT MARK" shows the earliest reminder that is not done.
+3. Tick a reminder done ("LOGGED") or back to open, and clear (delete) it.
+4. Changes persist across reloads in this browser. Corrupt or foreign data in the storage key no longer crashes the
+   page: it falls back to the starter list and drops malformed entries.
+5. `/api/mcp` answers JSON-RPC with `get_sample_reminders` and `next_reminder` (orders reminders the caller sends
+   and returns the earliest open one). The server cannot see a visitor's reminders and sends nothing.
+6. Front-end and server errors go to Sentry (errors only, personal data stripped) when `NEXT_PUBLIC_SENTRY_DSN` is set.
 
-## Current product truth
+## What does not work (and must not be claimed)
 
-- A small local reminder list with a message, date/time, completion state, and
-  delete action.
-- Items persist in localStorage and are edited in the browser.
-- It does not send notifications, sync across devices, require an account, or
-  claim a hosted reminder service.
+- No browser notifications or any other alert (no Notification API; the page shows "NO ALERTS"), no recurring
+  reminders, snooze or priority levels, no IndexedDB, no cross-device use (claims removed from the portfolio card
+  in the 2026-10 review).
+- No account, sync or export. Clearing site data removes everything.
+- No product analytics beyond Vercel Analytics.
 
-## Source README excerpt
+## Live URL and deploy state
 
-```
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+- Live: https://reminders.bookchaowalit.com (HTTP 200 on 2026-10-23).
+- The Vercel project `bookchaowalit-reminders-frontend` is deployed only by CLI. The last production deploy is the
+  CVE patch (2026-10-23 12:28 +07, commit 6611aa5, Next 16.4.2). Its Git link names the old repository
+  (`bookchaowalit/bookchaowalit-reminders-frontend`), so a push to `main` does not deploy: the live site lags `main`
+  (no Sentry, old template MCP route) until the owner reconnects Vercel Git to this repository (owner action D9).
+- `NEXT_PUBLIC_SENTRY_DSN` is set on the Vercel project (Sentry project `productivity-reminders-web`, org
+  `personal-yu0`).
 
-## Getting Started
+## Boundaries
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize an
-```
+- Browser-only apart from the stateless `/api/mcp` route.
