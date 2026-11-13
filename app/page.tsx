@@ -1,128 +1,163 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
-import { STORAGE_KEY, addReminder as addTo, deleteReminder, nextOpen, openCount, parseReminders, readableWhen, serializeReminders, sortByWhen, toggleDone } from "@/lib/reminders";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { AppFoot, AppTop, ListButton, Pill, useIsClient, type Tone } from "@/components/app-shell";
 import { createLocalStore, useLocalStore } from "@/lib/local-store";
+import { STORAGE_KEY, addReminder as addTo, deleteReminder, formatWhen, isOverdue, listView, nextFullHour, nextOpen, parseReminders, restoreReminder, serializeReminders, toLocalInput, toggleDone, type Reminder, type ReminderList } from "@/lib/reminders";
 
 const store = createLocalStore(STORAGE_KEY, parseReminders, serializeReminders);
+const LISTS: { value: ReminderList; label: string; tone?: Tone }[] = [
+  { value: "open", label: "Open", tone: "green" },
+  { value: "overdue", label: "Overdue", tone: "red" },
+  { value: "done", label: "Completed", tone: "grey" },
+  { value: "all", label: "All" },
+];
 
 export default function Home() {
   const items = useLocalStore(store);
   const setItems = store.set;
+  // The clock only exists in the browser: overdue marks and the default time appear after hydration.
+  const isClient = useIsClient();
+  const now = isClient ? toLocalInput(new Date()) : null;
+  const [list, setList] = useState<ReminderList>("open");
   const [text, setText] = useState("");
-  const [when, setWhen] = useState("2026-08-24T16:00");
-  const ordered = useMemo(() => sortByWhen(items), [items]);
+  const [when, setWhen] = useState<string | null>(null);
+  const whenValue = when ?? (isClient ? nextFullHour(new Date()) : "");
+  const [removed, setRemoved] = useState<{ item: Reminder; viaKeyboard: boolean } | null>(null);
+  const [toastFocused, setToastFocused] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const textRef = useRef<HTMLInputElement>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
+
+  const visible = useMemo(() => listView(items, list, now), [items, list, now]);
+  const countOf = (value: ReminderList) => listView(items, value, now).length;
   const next = nextOpen(items);
 
-  function addReminder(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => { if (removed?.viaKeyboard) undoRef.current?.focus(); }, [removed]);
+  useEffect(() => {
+    if (!removed || toastFocused) return;
+    const timer = window.setTimeout(() => setRemoved(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [removed, toastFocused]);
+
+  function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!text.trim() || !when) return;
-    setItems((current) => addTo(current, text, when, () => crypto.randomUUID()));
+    if (!text.trim() || !whenValue) return;
+    setItems((current) => addTo(current, text, whenValue, () => crypto.randomUUID()));
+    setAnnouncement(`Added “${text.trim()}” for ${formatWhen(whenValue)}.`);
     setText("");
+    setWhen(null);
+    textRef.current?.focus();
+  }
+  function remove(item: Reminder, viaKeyboard: boolean) {
+    setItems((current) => deleteReminder(current, item.id));
+    setRemoved({ item, viaKeyboard });
+    setAnnouncement(`Removed “${item.text}”. Undo is available for a few seconds.`);
+  }
+  function closeToast() {
+    setRemoved(null);
+    setToastFocused(false);
+    textRef.current?.focus();
+  }
+  function undo() {
+    if (!removed) return;
+    const { item } = removed;
+    setItems((current) => restoreReminder(current, item));
+    setAnnouncement(`Restored “${item.text}”.`);
+    closeToast();
   }
 
+  const title = LISTS.find((entry) => entry.value === list)!.label;
+
   return (
-    <main className="tide-shell">
-      <div className="tide-frame">
-        <header className="tide-masthead">
-          <div className="tide-brand">
-            <span className="tide-mark" aria-hidden="true">TB</span>
-            <span>TIDEBOARD / REMINDERS</span>
-          </div>
-          <div className="tide-meta">
-            <span>LOCAL CURRENT</span>
-            <span>NO ALERTS</span>
-          </div>
-        </header>
+    <div className="as">
+      <a className="as-skip" href="#main">Skip to content</a>
+      <AppTop name="Reminders" tagline="Saved on this device · no notifications" />
 
-        <section className="tide-hero">
-          <div>
-            <h1>
-              Keep the next thing
-              <br />
-              <em>in sight.</em>
-            </h1>
-            <p>
-              A quiet local board for the messages and dates that should surface
-              before they drift out of reach.
-            </p>
-          </div>
-          <div className="tide-horizon">
-            <span className="tide-horizon-label">NEXT MARK</span>
-            <strong>{next ? readableWhen(next.when).split(" / ")[1] : "--:--"}</strong>
-            <span>{next ? next.text : "The board is clear."}</span>
-          </div>
-        </section>
-
-        <section className="tide-dock">
-          <div className="tide-section-head">
-            <span className="tide-index">A / MARK</span>
-            <span>{openCount(items)} open reminders</span>
-          </div>
-          <h2>Set the next mark.</h2>
-          <form className="tide-form" onSubmit={addReminder}>
-            <label className="tide-message-field">
-              <span>MESSAGE</span>
-              <input
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-                placeholder="What should stay in view?"
-              />
-            </label>
-            <label>
-              <span>WHEN</span>
-              <input type="datetime-local" required value={when} onChange={(event) => setWhen(event.target.value)} />
-            </label>
-            <button type="submit">Set reminder</button>
-          </form>
-          <p className="tide-note">
-            This board stores entries in localStorage. It does not send a notification
-            or sync to another device.
-          </p>
-        </section>
-
-        <section className="tide-list" aria-labelledby="tide-list-title">
-          <div className="tide-section-head">
-            <span className="tide-index">B / CURRENT</span>
-            <span>{items.length.toString().padStart(2, "0")} marks on chart</span>
-          </div>
-          <h2 id="tide-list-title">The current chart.</h2>
-          <ol className="tide-rows">
-            {ordered.map((item, index) => (
-              <li key={item.id} className={"tide-row " + (item.done ? "is-done" : "")}>
-                <span className="tide-row-index">{String(index + 1).padStart(2, "0")}</span>
-                <span className="tide-row-notch" aria-hidden="true" />
-                <div className="tide-row-copy">
-                  <strong>{item.text}</strong>
-                  <span>{readableWhen(item.when)}</span>
-                </div>
-                <label className="tide-complete">
-                  <input
-                    type="checkbox"
-                    checked={item.done}
-                    onChange={() => setItems((current) => toggleDone(current, item.id))}
-                    aria-label={"Complete " + item.text}
-                  />
-                  <span>{item.done ? "LOGGED" : "OPEN"}</span>
-                </label>
-                <button
-                  className="tide-delete"
-                  type="button"
-                  onClick={() => setItems((current) => deleteReminder(current, item.id))}
-                  aria-label={"Clear " + item.text}
-                >
-                  Clear
-                </button>
-              </li>
+      <div className="as-body">
+        <aside className="as-side" aria-label="Lists">
+          <h2>Lists</h2>
+          <ul className="as-lists">
+            {LISTS.map(({ value, label, tone }) => (
+              <ListButton key={value} label={label} count={countOf(value)} tone={tone} current={list === value} onSelect={() => setList(value)} />
             ))}
-          </ol>
-        </section>
+          </ul>
+        </aside>
 
-        <footer className="tide-footer">
-          <span>BOOK / DEV TOOLS</span>
-          <span>MARK · WATCH · CLEAR</span>
-        </footer>
+        <main id="main" className="as-main">
+          <div className="as-head">
+            <div>
+              <h1>{title}</h1>
+              <p aria-live="polite">{next ? <>Next: {next.text} · {formatWhen(next.when)}</> : "Nothing open. You are all caught up."}</p>
+            </div>
+          </div>
+
+          <form className="as-composer" onSubmit={add} aria-label="New reminder">
+            <div className="as-composer-grid">
+              <label className="as-field">Reminder
+                <input ref={textRef} value={text} onChange={(event) => setText(event.target.value)} placeholder="What should you remember?" autoComplete="off" />
+              </label>
+              <label className="as-field">When
+                <input type="datetime-local" value={whenValue} onChange={(event) => setWhen(event.target.value)} />
+              </label>
+              <button type="submit" className="as-button" disabled={!text.trim() || !whenValue}>Add</button>
+            </div>
+          </form>
+
+          {visible.length ? (
+            <ul className="as-list" aria-label={title}>
+              {visible.map((item) => {
+                const late = now !== null && isOverdue(item, now);
+                return (
+                  <li className="as-row as-row-check" key={item.id} data-done={item.done ? "true" : undefined}>
+                    <label className="as-check">
+                      <input type="checkbox" checked={item.done} onChange={() => setItems((current) => toggleDone(current, item.id))} aria-label={`${item.text}: mark as ${item.done ? "not done" : "done"}`} />
+                      <span aria-hidden="true" />
+                    </label>
+                    <div>
+                      <h3>{item.text}</h3>
+                      <p><time dateTime={item.when}>{formatWhen(item.when)}</time></p>
+                    </div>
+                    {late ? <Pill tone="red">Overdue</Pill> : item.done ? <Pill tone="grey">Done</Pill> : <Pill tone="green">Open</Pill>}
+                    <button type="button" className="as-plain as-danger" aria-label={`Remove ${item.text}`} onClick={(event) => remove(item, event.detail === 0)}>Remove</button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="as-list as-empty">
+              {items.length === 0 ? (
+                <><strong>No reminders yet</strong>Type a reminder above, pick a time and press Add.</>
+              ) : list === "overdue" ? (
+                <><strong>Nothing overdue</strong>Every open reminder is still ahead of you.</>
+              ) : list === "done" ? (
+                <><strong>Nothing completed yet</strong>Tick a reminder when it is handled.</>
+              ) : (
+                <><strong>All caught up</strong>Every reminder here is complete.</>
+              )}
+            </div>
+          )}
+
+          <p className="as-note">Reminders are saved in this browser only. This page does not send notifications or sync to other devices.</p>
+        </main>
       </div>
-    </main>
+
+      <p className="as-sr" role="status" aria-live="polite">{announcement}</p>
+      {removed ? (
+        <div
+          className="as-toast"
+          role="group"
+          aria-label="Undo remove"
+          onFocus={() => setToastFocused(true)}
+          onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setToastFocused(false); }}
+          onKeyDown={(event) => { if (event.key === "Escape") closeToast(); }}
+        >
+          <span>Removed “{removed.item.text}”</span>
+          <button ref={undoRef} type="button" className="as-plain" onClick={undo}>Undo</button>
+        </div>
+      ) : null}
+
+      <AppFoot source="https://github.com/bookchaowalit-website/productivity-reminders-web" />
+    </div>
   );
 }

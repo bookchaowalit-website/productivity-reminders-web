@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   STARTER,
+  formatWhen,
+  isOverdue,
+  listView,
+  nextFullHour,
+  restoreReminder,
   addReminder,
   deleteReminder,
   nextOpen,
@@ -76,5 +81,39 @@ describe("reminder logic", () => {
     expect(toggleDone(items, "a")[1].done).toBe(false);
     expect(toggleDone(items, "b")[0].done).toBe(true);
     expect(deleteReminder(items, "c").map((r) => r.id)).toEqual(["b", "a"]);
+  });
+});
+
+describe("App shell helpers", () => {
+  const items = [
+    { id: "a", text: "past open", when: "2026-08-24T09:00", done: false },
+    { id: "b", text: "future open", when: "2027-01-02T08:30", done: false },
+    { id: "c", text: "past done", when: "2026-08-25T10:00", done: true },
+  ];
+
+  it("formats a datetime-local value the same everywhere", () => {
+    expect(formatWhen("2026-08-24T09:00")).toBe("Mon 24 Aug 2026 · 09:00");
+    expect(formatWhen("2027-01-02")).toBe("Sat 2 Jan 2027 · 00:00");
+    expect(formatWhen("not a date")).toBe("not a date");
+  });
+
+  it("defaults new reminders to the next full hour in local time", () => {
+    expect(nextFullHour(new Date(2026, 10, 13, 16, 42))).toBe("2026-11-13T17:00");
+    expect(nextFullHour(new Date(2026, 11, 31, 23, 5))).toBe("2027-01-01T00:00");
+  });
+
+  it("splits reminders into open, overdue, done and all lists", () => {
+    const now = "2026-11-13T12:00";
+    expect(listView(items, "open", now).map((r) => r.id)).toEqual(["a", "b"]);
+    expect(listView(items, "overdue", now).map((r) => r.id)).toEqual(["a"]);
+    expect(listView(items, "overdue", null)).toEqual([]);
+    expect(listView(items, "done", now).map((r) => r.id)).toEqual(["c"]);
+    expect(listView(items, "all", now).map((r) => r.id)).toEqual(["a", "c", "b"]);
+    expect(isOverdue(items[2], now)).toBe(false);
+  });
+
+  it("restores a removed reminder once", () => {
+    expect(restoreReminder(items.slice(1), items[0]).map((r) => r.id)).toEqual(["b", "c", "a"]);
+    expect(restoreReminder(items, items[0])).toBe(items);
   });
 });

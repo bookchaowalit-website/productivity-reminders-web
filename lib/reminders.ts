@@ -70,3 +70,53 @@ export function toggleDone(items: Reminder[], id: string): Reminder[] {
 export function deleteReminder(items: Reminder[], id: string): Reminder[] {
   return items.filter((r) => r.id !== id);
 }
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * "Mon 24 Aug 2026 · 09:00" from a datetime-local string. Built by hand (not Intl) so the server
+ * and the browser print exactly the same text; the weekday comes from the calendar date alone.
+ */
+export function formatWhen(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(value);
+  if (!match) return value;
+  const [, y, m, d, hh = "00", mm = "00"] = match;
+  const weekday = WEEKDAYS[new Date(Date.UTC(Number(y), Number(m) - 1, Number(d))).getUTCDay()];
+  return `${weekday} ${Number(d)} ${MONTHS[Number(m) - 1]} ${y} · ${hh}:${mm}`;
+}
+
+/** The viewer's local time as a datetime-local string (YYYY-MM-DDTHH:MM). */
+export function toLocalInput(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Default for a new reminder: the next full hour after `now`. */
+export function nextFullHour(now: Date): string {
+  const next = new Date(now);
+  next.setMinutes(0, 0, 0);
+  next.setHours(next.getHours() + 1);
+  return toLocalInput(next);
+}
+
+/** Open and due before `now` (both datetime-local strings, so text order is time order). */
+export function isOverdue(item: Reminder, now: string): boolean {
+  return !item.done && item.when < now;
+}
+
+export type ReminderList = "open" | "overdue" | "done" | "all";
+
+/** The rows a list shows, earliest first. Overdue needs the viewer's clock, so `now` may be null. */
+export function listView(items: Reminder[], list: ReminderList, now: string | null): Reminder[] {
+  const sorted = sortByWhen(items);
+  if (list === "open") return sorted.filter((r) => !r.done);
+  if (list === "done") return sorted.filter((r) => r.done);
+  if (list === "overdue") return now ? sorted.filter((r) => isOverdue(r, now)) : [];
+  return sorted;
+}
+
+/** Undo for a removal: put it back unless it is already there (rows are shown sorted by time). */
+export function restoreReminder(items: Reminder[], item: Reminder): Reminder[] {
+  return items.some((r) => r.id === item.id) ? items : [...items, item];
+}
