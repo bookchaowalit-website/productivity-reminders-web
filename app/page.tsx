@@ -70,6 +70,9 @@ export default function Home() {
     event.preventDefault();
     if (!text.trim() || !whenValue) return;
     setItems((current) => addTo(current, text, whenValue, () => crypto.randomUUID()));
+    // A new reminder is open; if the list on screen would hide it (Completed, or Overdue with a
+    // future time), switch to Open so the person sees what they just added.
+    if (list === "done" || (list === "overdue" && !(now !== null && whenValue < now))) setList("open");
     setAnnouncement(`Added “${text.trim()}” for ${formatWhen(whenValue)}.`);
     setText("");
     setWhen(null);

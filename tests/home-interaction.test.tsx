@@ -167,3 +167,26 @@ describe("review fixes", () => {
     expect(document.activeElement).toBe(textInput());
   });
 });
+
+describe("adding from a list that would hide the new reminder", () => {
+  it("switches from Completed to Open so the new reminder is visible", () => {
+    press(button("Completed", $(".as-side")!));
+    type(textInput(), "Book flights");
+    press(button("Add", $(".as-composer")!));
+    expect($("h1")!.textContent).toBe("Open");
+    expect(rows()).toContain("Book flights");
+  });
+
+  it("stays in Overdue when the new time is already past, switches to Open when it is ahead", () => {
+    press(button("Overdue", $(".as-side")!));
+    type(textInput(), "Late one");
+    type(whenInput(), "2026-11-13T08:00");
+    press(button("Add", $(".as-composer")!));
+    expect($("h1")!.textContent).toBe("Overdue");
+    expect(rows()).toContain("Late one");
+    type(textInput(), "Later one");
+    press(button("Add", $(".as-composer")!));
+    expect($("h1")!.textContent).toBe("Open");
+    expect(rows()).toContain("Later one");
+  });
+});
