@@ -1,3 +1,11 @@
+# Reminders — design
+
+Since 2026-11-13 this app uses the shared App shell (`APP-SHELL.md`): Open / Overdue /
+Completed / All lists, a quick-add with a time defaulting to the next full hour, round checks,
+Overdue pills and undoable remove. The earlier "Tideboard" theme below is kept for history.
+
+---
+
 # Tideboard — Design System
 
 ## Overview

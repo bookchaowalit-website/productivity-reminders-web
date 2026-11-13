@@ -5,6 +5,8 @@ export const metadata: Metadata = {
   title: 'Related Projects - Reminders',
   description: 'Explore more projects by Bookchaowalit. Discover our collection of web applications and tools.',
   keywords: ['related projects', 'more apps', 'Bookchaowalit', 'web applications'],
+  // Its own canonical, so the root layout's "/" does not fold this page into the home page.
+  alternates: { canonical: '/more-projects' },
   openGraph: {
     title: 'Related Projects - Reminders',
     description: 'Explore more projects by Bookchaowalit',
