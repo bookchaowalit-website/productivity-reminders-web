@@ -1,11 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { AppFoot, AppTop, ListButton, Pill, useIsClient, type Tone } from "@/components/app-shell";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { AppFoot, AppTop, ListButton, Pill, type Tone } from "@/components/app-shell";
 import { createLocalStore, useLocalStore } from "@/lib/local-store";
 import { STORAGE_KEY, addReminder as addTo, deleteReminder, formatWhen, isOverdue, listView, nextFullHour, nextOpen, parseReminders, restoreReminder, serializeReminders, toLocalInput, toggleDone, type Reminder, type ReminderList } from "@/lib/reminders";
 
 const store = createLocalStore(STORAGE_KEY, parseReminders, serializeReminders);
+
+// The viewer's clock at minute resolution, re-read every 30 s so Overdue marks appear on their own
+// while the page stays open. null on the server and during hydration (no time baked into HTML).
+function subscribeClock(listener: () => void) {
+  const timer = window.setInterval(listener, 30_000);
+  return () => window.clearInterval(timer);
+}
+function useNow(): string | null {
+  return useSyncExternalStore(subscribeClock, () => toLocalInput(new Date()), () => null);
+}
 const LISTS: { value: ReminderList; label: string; tone?: Tone }[] = [
   { value: "open", label: "Open", tone: "green" },
   { value: "overdue", label: "Overdue", tone: "red" },
@@ -17,12 +27,14 @@ export default function Home() {
   const items = useLocalStore(store);
   const setItems = store.set;
   // The clock only exists in the browser: overdue marks and the default time appear after hydration.
-  const isClient = useIsClient();
-  const now = isClient ? toLocalInput(new Date()) : null;
+  const now = useNow();
   const [list, setList] = useState<ReminderList>("open");
   const [text, setText] = useState("");
   const [when, setWhen] = useState<string | null>(null);
-  const whenValue = when ?? (isClient ? nextFullHour(new Date()) : "");
+  // Until the person types, the time follows the clock; from the first keystroke it is fixed, so it
+  // cannot jump to the next hour while they are still writing.
+  const whenValue = when ?? (now ? nextFullHour(new Date()) : "");
+  const focusAfterToggle = useRef<number | null>(null);
   const [removed, setRemoved] = useState<{ item: Reminder; viaKeyboard: boolean } | null>(null);
   const [toastFocused, setToastFocused] = useState(false);
   const [announcement, setAnnouncement] = useState("");
@@ -34,6 +46,20 @@ export default function Home() {
   const next = nextOpen(items);
 
   useEffect(() => { if (removed?.viaKeyboard) undoRef.current?.focus(); }, [removed]);
+  // Ticking a row in Open (or unticking in Completed) removes it from the list, and with it the
+  // focused checkbox: move focus to the row now in that place, or to the reminder field.
+  useEffect(() => {
+    const index = focusAfterToggle.current;
+    if (index === null) return;
+    focusAfterToggle.current = null;
+    const checks = document.querySelectorAll<HTMLInputElement>(".as-list .as-check input");
+    (checks[Math.min(index, checks.length - 1)] ?? textRef.current)?.focus();
+  }, [visible]);
+  function toggle(item: Reminder, index: number) {
+    const leaves = list === "open" || list === "done" || (list === "overdue" && !item.done);
+    if (leaves) focusAfterToggle.current = index;
+    setItems((current) => toggleDone(current, item.id));
+  }
   useEffect(() => {
     if (!removed || toastFocused) return;
     const timer = window.setTimeout(() => setRemoved(null), 6000);
@@ -95,7 +121,7 @@ export default function Home() {
           <form className="as-composer" onSubmit={add} aria-label="New reminder">
             <div className="as-composer-grid">
               <label className="as-field">Reminder
-                <input ref={textRef} value={text} onChange={(event) => setText(event.target.value)} placeholder="What should you remember?" autoComplete="off" />
+                <input ref={textRef} value={text} onChange={(event) => { if (when === null && whenValue) setWhen(whenValue); setText(event.target.value); }} placeholder="What should you remember?" autoComplete="off" />
               </label>
               <label className="as-field">When
                 <input type="datetime-local" value={whenValue} onChange={(event) => setWhen(event.target.value)} />
@@ -106,12 +132,12 @@ export default function Home() {
 
           {visible.length ? (
             <ul className="as-list" aria-label={title}>
-              {visible.map((item) => {
+              {visible.map((item, index) => {
                 const late = now !== null && isOverdue(item, now);
                 return (
                   <li className="as-row as-row-check" key={item.id} data-done={item.done ? "true" : undefined}>
                     <label className="as-check">
-                      <input type="checkbox" checked={item.done} onChange={() => setItems((current) => toggleDone(current, item.id))} aria-label={`${item.text}: mark as ${item.done ? "not done" : "done"}`} />
+                      <input type="checkbox" checked={item.done} onChange={() => toggle(item, index)} aria-label={`${item.text}: mark as ${item.done ? "not done" : "done"}`} />
                       <span aria-hidden="true" />
                     </label>
                     <div>

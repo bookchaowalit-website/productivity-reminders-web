@@ -120,3 +120,50 @@ describe("remove and undo", () => {
     expect($(".as-toast")).toBeNull();
   });
 });
+
+describe("review fixes", () => {
+  // The clock subscription starts on mount, so remount after switching to fully fake timers.
+  function remountWithFakeTimers(at: Date) {
+    act(() => root.unmount());
+    vi.useFakeTimers();
+    vi.setSystemTime(at);
+    root = createRoot(host);
+    act(() => root.render(<Home />));
+  }
+
+  it("marks a reminder overdue on its own once its time passes, while the page stays open", () => {
+    remountWithFakeTimers(new Date(2026, 10, 13, 12, 20));
+    type(textInput(), "Stand-up");
+    type(whenInput(), "2026-11-13T12:30");
+    press(button("Add", $(".as-composer")!));
+    const pillOf = () => [...host.querySelectorAll(".as-row")].find((row) => row.textContent?.includes("Stand-up"))!.querySelector(".as-pill")!.textContent;
+    expect(pillOf()).toBe("Open");
+    vi.setSystemTime(new Date(2026, 10, 13, 12, 31));
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(pillOf()).toBe("Overdue");
+  });
+
+  it("keeps the default time fixed once typing starts, even when the hour rolls over", () => {
+    remountWithFakeTimers(new Date(2026, 10, 13, 12, 58));
+    expect(whenInput().value).toBe("2026-11-13T13:00");
+    vi.setSystemTime(new Date(2026, 10, 13, 13, 0, 10));
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(whenInput().value).toBe("2026-11-13T14:00");
+    vi.setSystemTime(new Date(2026, 10, 13, 12, 59));
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(whenInput().value).toBe("2026-11-13T13:00");
+    type(textInput(), "Water plants");
+    vi.setSystemTime(new Date(2026, 10, 13, 13, 1));
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(whenInput().value).toBe("2026-11-13T13:00");
+  });
+
+  it("ticking a row in Open moves focus to the row now in its place, then to the reminder field", () => {
+    const first = $<HTMLInputElement>('[aria-label="Ship portfolio batch: mark as done"]')!;
+    first.focus();
+    act(() => { first.click(); });
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Review the next route: mark as done");
+    act(() => { (document.activeElement as HTMLInputElement).click(); });
+    expect(document.activeElement).toBe(textInput());
+  });
+});
