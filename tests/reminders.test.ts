@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   STARTER,
   formatWhen,
+  headline,
+  nextUpcoming,
   isOverdue,
   listView,
   nextFullHour,
@@ -59,6 +61,21 @@ describe("reminder logic", () => {
     expect(nextOpen(items)?.id).toBe("c");
     expect(nextOpen(items.map((r) => ({ ...r, done: true })))).toBeUndefined();
     expect(openCount(items)).toBe(2);
+  });
+
+  // Bug (BOO-400): the header said "Next: Ship portfolio batch" although that reminder was overdue.
+  it("next upcoming skips overdue and done reminders", () => {
+    expect(nextUpcoming(items, "2026-09-01T13:00")?.id).toBe("b");
+    expect(nextUpcoming(items, "2026-09-01T12:00")?.id).toBe("c");
+    expect(nextUpcoming(items, "2026-09-03T00:00")).toBeUndefined();
+  });
+
+  it("headline puts the overdue count before the next upcoming reminder", () => {
+    expect(headline(items, "2026-08-31T00:00")).toBe("Next: Middle · Tue 1 Sep 2026 · 12:00");
+    expect(headline(items, "2026-09-01T13:00")).toBe("1 overdue · Next: Later · Wed 2 Sep 2026 · 10:00");
+    expect(headline(items, "2026-09-03T00:00")).toBe("2 overdue · Nothing else coming up");
+    expect(headline(items, null)).toBe("2 open");
+    expect(headline(items.map((r) => ({ ...r, done: true })), "2026-09-01T13:00")).toBe("Nothing open. You are all caught up.");
   });
 
   it("formats the time as date / time and tolerates a missing time", () => {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { AppFoot, AppTop, ListButton, Pill, type Tone } from "@/components/app-shell";
 import { createLocalStore, useLocalStore } from "@/lib/local-store";
-import { STORAGE_KEY, addReminder as addTo, deleteReminder, formatWhen, isOverdue, listView, nextFullHour, nextOpen, parseReminders, restoreReminder, serializeReminders, toLocalInput, toggleDone, type Reminder, type ReminderList } from "@/lib/reminders";
+import { STORAGE_KEY, addReminder as addTo, deleteReminder, formatWhen, headline, isOverdue, listView, nextFullHour, parseReminders, restoreReminder, serializeReminders, toLocalInput, toggleDone, type Reminder, type ReminderList } from "@/lib/reminders";
 
 const store = createLocalStore(STORAGE_KEY, parseReminders, serializeReminders);
 
@@ -43,7 +43,6 @@ export default function Home() {
 
   const visible = useMemo(() => listView(items, list, now), [items, list, now]);
   const countOf = (value: ReminderList) => listView(items, value, now).length;
-  const next = nextOpen(items);
 
   useEffect(() => { if (removed?.viaKeyboard) undoRef.current?.focus(); }, [removed]);
   // Ticking a row in Open (or unticking in Completed) removes it from the list, and with it the
@@ -117,7 +116,7 @@ export default function Home() {
           <div className="as-head">
             <div>
               <h1>{title}</h1>
-              <p aria-live="polite">{next ? <>Next: {next.text} · {formatWhen(next.when)}</> : "Nothing open. You are all caught up."}</p>
+              <p aria-live="polite">{headline(items, now)}</p>
             </div>
           </div>
 

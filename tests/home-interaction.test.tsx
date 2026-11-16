@@ -45,6 +45,19 @@ describe("after hydration", () => {
     press(button("Overdue", $(".as-side")!));
     expect(rows()).toEqual(["Ship portfolio batch", "Review the next route"]);
   });
+
+  it("the header counts overdue reminders first and names only an upcoming one as Next", () => {
+    const head = () => $(".as-head p")!.textContent;
+    expect(head()).toBe("2 overdue · Nothing else coming up");
+    type(textInput(), "Renew passport");
+    type(whenInput(), "2027-02-01T09:30");
+    press(button("Add", $(".as-composer")!));
+    expect(head()).toBe("2 overdue · Next: Renew passport · Mon 1 Feb 2027 · 09:30");
+    for (const text of ["Ship portfolio batch", "Review the next route"]) {
+      act(() => { $<HTMLInputElement>(`[aria-label="${text}: mark as done"]`)!.click(); });
+    }
+    expect(head()).toBe("Next: Renew passport · Mon 1 Feb 2027 · 09:30");
+  });
 });
 
 describe("adding", () => {
