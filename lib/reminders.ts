@@ -105,6 +105,25 @@ export function isOverdue(item: Reminder, now: string): boolean {
   return !item.done && item.when < now;
 }
 
+/** The earliest open reminder that is not overdue yet (due at or after `now`). */
+export function nextUpcoming(items: Reminder[], now: string): Reminder | undefined {
+  return sortByWhen(items).find((r) => !r.done && r.when >= now);
+}
+
+/**
+ * The line under the title. Overdue ones come first ("1 overdue"), then the next upcoming reminder.
+ * Without the viewer's clock (`now` null, before hydration) only the open count is known.
+ */
+export function headline(items: Reminder[], now: string | null): string {
+  const open = openCount(items);
+  if (open === 0) return "Nothing open. You are all caught up.";
+  if (now === null) return `${open} open`;
+  const overdue = items.filter((r) => isOverdue(r, now)).length;
+  const next = nextUpcoming(items, now);
+  const nextText = next ? `Next: ${next.text} · ${formatWhen(next.when)}` : "Nothing else coming up";
+  return overdue > 0 ? `${overdue} overdue · ${nextText}` : nextText;
+}
+
 export type ReminderList = "open" | "overdue" | "done" | "all";
 
 /** The rows a list shows, earliest first. Overdue needs the viewer's clock, so `now` may be null. */
