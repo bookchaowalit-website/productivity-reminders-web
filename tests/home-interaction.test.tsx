@@ -235,14 +235,16 @@ describe("adding from a list that would hide the new reminder", () => {
   });
 
   it("warns, linked to the field, when the chosen time has already passed", () => {
-    expect($("#when-hint")).toBeNull();
+    // A polite live region from the start, so the warning is announced without moving focus.
+    expect($("#when-hint")!.getAttribute("aria-live")).toBe("polite");
+    expect($("#when-hint")!.textContent).toBe("");
     type(whenInput(), "2026-11-12T09:00");
     expect($("#when-hint")!.textContent).toBe("This time has passed, so the reminder will show as Overdue.");
     expect(whenInput().getAttribute("aria-describedby")).toBe("when-hint");
     // Described by the hint, but not named by it: the hint sits outside the When label.
     expect(whenInput().closest("label")!.contains($("#when-hint"))).toBe(false);
     type(whenInput(), "2026-11-14T09:00");
-    expect($("#when-hint")).toBeNull();
+    expect($("#when-hint")!.textContent).toBe("");
   });
 
   it("a mouse resting on the Undo toast keeps it open; leaving restarts the countdown", () => {

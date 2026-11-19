@@ -15,7 +15,7 @@ describe("home page (server render)", () => {
 
   it("does not print anything that depends on the viewer's clock", () => {
     expect(html).not.toContain('data-tone="red">Overdue');
-    expect(html).toMatch(/type="datetime-local" value=""/);
+    expect(html).toMatch(/type="datetime-local"[^>]* value=""/);
     // The sample reminders are dated from the viewer's clock, so no time is printed before hydration.
     expect(html).not.toContain("<time");
   });
