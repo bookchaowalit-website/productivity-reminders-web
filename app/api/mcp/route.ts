@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { STARTER, nextOpen, openCount, sanitizeReminders, sortByWhen } from "@/lib/reminders";
+import { starterReminders, nextOpen, openCount, sanitizeReminders, sortByWhen } from "@/lib/reminders";
 
 // Stateless JSON-RPC MCP endpoint. Reminders live in the visitor's browser (localStorage), so the server
 // cannot read them and never sends notifications: it serves the starter list and orders reminders the caller sends.
@@ -33,7 +33,7 @@ class RpcError extends Error {
 function callTool(name: string | undefined, args: Record<string, unknown> = {}) {
   switch (name) {
     case "get_sample_reminders":
-      return { reminders: STARTER };
+      return { reminders: starterReminders(new Date()) };
     case "next_reminder": {
       if (!Array.isArray(args.reminders)) throw new RpcError(-32602, "reminders must be an array");
       const reminders = sanitizeReminders(args.reminders);

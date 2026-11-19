@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { POST } from "@/app/api/mcp/route";
-import { STARTER } from "@/lib/reminders";
+import { starterReminders } from "@/lib/reminders";
 
 function rpc(body: unknown) {
   return POST(new Request("http://localhost/api/mcp", { method: "POST", body: JSON.stringify(body) }));
@@ -19,7 +19,8 @@ describe("MCP route", () => {
 
   it("get_sample_reminders returns the starter list the page begins with", async () => {
     const res = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "get_sample_reminders" } });
-    expect((await res.json()).result.reminders).toEqual(STARTER);
+    const { reminders } = (await res.json()).result;
+    expect(reminders.map((r: { text: string }) => r.text)).toEqual(starterReminders(new Date()).map((r) => r.text));
   });
 
   it("next_reminder picks the earliest open reminder from the ones it is given", async () => {

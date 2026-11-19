@@ -5,11 +5,27 @@ export type Reminder = { id: string; text: string; when: string; done: boolean }
 
 export const STORAGE_KEY = "reminders-v1";
 
-export const STARTER: Reminder[] = [
-  { id: "1", text: "Ship portfolio batch", when: "2026-08-24T09:00", done: false },
-  { id: "2", text: "Review the next route", when: "2026-08-24T14:30", done: false },
-  { id: "3", text: "Archive loose notes", when: "2026-08-25T10:00", done: true },
-];
+/**
+ * Sample reminders for a first visit, dated from the viewer's clock so none of them starts out
+ * Overdue: one later today (the hour after next), one tomorrow at 09:00, and one handled
+ * yesterday. The order (yesterday < later today < tomorrow 09:00) is the same whatever `now` is.
+ */
+export function starterReminders(now: Date): Reminder[] {
+  const at = (days: number, hours: number, minutes = 0) => {
+    const date = new Date(now);
+    date.setDate(date.getDate() + days);
+    date.setHours(hours, minutes, 0, 0);
+    return toLocalInput(date);
+  };
+  const later = new Date(now);
+  later.setMinutes(0, 0, 0);
+  later.setHours(later.getHours() + 2);
+  return [
+    { id: "1", text: "Ship portfolio batch", when: toLocalInput(later), done: false },
+    { id: "2", text: "Review the next route", when: at(1, 9), done: false },
+    { id: "3", text: "Archive loose notes", when: at(-1, 10), done: true },
+  ];
+}
 
 function toReminder(value: unknown): Reminder | null {
   if (typeof value !== "object" || value === null) return null;
@@ -24,15 +40,15 @@ export function sanitizeReminders(data: unknown[]): Reminder[] {
 }
 
 /** Parse what the page stored. Missing or corrupt data falls back to the starter list. */
-export function parseReminders(raw: string | null): Reminder[] {
-  if (raw === null) return STARTER;
+export function parseReminders(raw: string | null, now: Date = new Date()): Reminder[] {
+  if (raw === null) return starterReminders(now);
   let data: unknown;
   try {
     data = JSON.parse(raw);
   } catch {
-    return STARTER;
+    return starterReminders(now);
   }
-  return Array.isArray(data) ? sanitizeReminders(data) : STARTER;
+  return Array.isArray(data) ? sanitizeReminders(data) : starterReminders(now);
 }
 
 export function serializeReminders(items: Reminder[]): string {

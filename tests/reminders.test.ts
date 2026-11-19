@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  STARTER,
+  starterReminders,
+  toLocalInput,
   formatWhen,
   headline,
   nextUpcoming,
@@ -28,7 +29,19 @@ const items: Reminder[] = [
 
 describe("parseReminders", () => {
   it("falls back to the starter list when nothing is stored", () => {
-    expect(parseReminders(null)).toEqual(STARTER);
+    expect(parseReminders(null, new Date(2026, 10, 18, 14, 25))).toEqual(starterReminders(new Date(2026, 10, 18, 14, 25)));
+  });
+
+  // 2026-11-18 review: fixed August dates made every first visit open on two red Overdue pills.
+  it("dates the starter list from the clock: nothing overdue, one done yesterday", () => {
+    const now = new Date(2026, 10, 18, 14, 25);
+    const starter = starterReminders(now);
+    expect(starter.map((r) => r.when)).toEqual(["2026-11-18T16:00", "2026-11-19T09:00", "2026-11-17T10:00"]);
+    expect(starter.filter((r) => isOverdue(r, toLocalInput(now)))).toEqual([]);
+    expect(headline(starter, toLocalInput(now))).toBe("Next: Ship portfolio batch · Wed 18 Nov 2026 · 16:00");
+    // Late evening: "later today" rolls into tomorrow but still sorts before 09:00.
+    const late = starterReminders(new Date(2026, 10, 18, 23, 10));
+    expect(sortByWhen(late).map((r) => r.id)).toEqual(["3", "1", "2"]);
   });
 
   it("round-trips what serializeReminders wrote", () => {
@@ -38,7 +51,7 @@ describe("parseReminders", () => {
   // Bug: the page did JSON.parse(saved) as Reminder[] and then [...items].sort(...),
   // so corrupt or foreign data in localStorage crashed the page.
   it.each(["oops", "null", "1", '{"items":[]}'])("survives corrupt storage %s", (raw) => {
-    expect(parseReminders(raw)).toEqual(STARTER);
+    expect(parseReminders(raw, new Date(2026, 10, 18, 14, 25))).toEqual(starterReminders(new Date(2026, 10, 18, 14, 25)));
   });
 
   it("drops malformed entries", () => {

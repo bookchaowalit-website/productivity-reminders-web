@@ -11,7 +11,7 @@ let root: Root;
 let host: HTMLDivElement;
 const $ = <T extends Element = HTMLElement>(selector: string) => host.querySelector(selector) as T | null;
 const button = (text: string, scope: ParentNode = host) => [...scope.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith(text)) as HTMLButtonElement;
-const rows = () => [...host.querySelectorAll(".as-row h3")].map((h) => h.textContent);
+const rows = () => [...host.querySelectorAll(".as-row h2")].map((h) => h.textContent);
 const press = (el: Element, detail = 0) => act(() => { el.dispatchEvent(new MouseEvent("click", { bubbles: true, detail })); });
 function type(el: HTMLInputElement, value: string) {
   act(() => {
@@ -23,10 +23,18 @@ const stored = () => JSON.parse(localStorage.getItem("reminders-v1") ?? "null") 
 const textInput = () => $<HTMLInputElement>('.as-composer input:not([type="datetime-local"])')!;
 const whenInput = () => $<HTMLInputElement>('.as-composer input[type="datetime-local"]')!;
 
+const SAVED = [
+  { id: "1", text: "Ship portfolio batch", when: "2026-08-24T09:00", done: false },
+  { id: "2", text: "Review the next route", when: "2026-08-24T14:30", done: false },
+  { id: "3", text: "Archive loose notes", when: "2026-08-25T10:00", done: true },
+];
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 10, 13, 12, 20));
   localStorage.clear();
+  // Most tests start from saved reminders with past August times (two of them overdue).
+  localStorage.setItem("reminders-v1", JSON.stringify(SAVED));
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -201,5 +209,50 @@ describe("adding from a list that would hide the new reminder", () => {
     press(button("Add", $(".as-composer")!));
     expect($("h1")!.textContent).toBe("Open");
     expect(rows()).toContain("Later one");
+  });
+
+  // 2026-11-18 review round 2.
+  it("a first visit starts from sample reminders dated from the clock, none of them overdue", () => {
+    act(() => root.unmount());
+    localStorage.clear();
+    root = createRoot(host);
+    act(() => root.render(<Home />));
+    expect([...host.querySelectorAll(".as-pill")].map((p) => p.textContent)).toEqual(["Open", "Open"]);
+    expect($(".as-head p")!.textContent).toMatch(/^Next: Ship portfolio batch · /);
+  });
+
+  it("warns, linked to the field, when the chosen time has already passed", () => {
+    expect($("#when-hint")).toBeNull();
+    type(whenInput(), "2026-11-12T09:00");
+    expect($("#when-hint")!.textContent).toBe("This time has passed, so the reminder will show as Overdue.");
+    expect(whenInput().getAttribute("aria-describedby")).toBe("when-hint");
+    type(whenInput(), "2026-11-14T09:00");
+    expect($("#when-hint")).toBeNull();
+  });
+
+  it("a mouse resting on the Undo toast keeps it open; leaving restarts the countdown", () => {
+    act(() => root.unmount());
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 13, 12, 20));
+    root = createRoot(host);
+    act(() => root.render(<Home />));
+    press($('[aria-label="Remove Ship portfolio batch"]')!, 1);
+    const toast = $(".as-toast")!;
+    act(() => { toast.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); });
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect($(".as-toast")).not.toBeNull();
+    act(() => { toast.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body })); });
+    act(() => { vi.advanceTimersByTime(6000); });
+    expect($(".as-toast")).toBeNull();
+  });
+
+  it("keeps the heading outline in order: one h1 first, row titles are h2, no h3", () => {
+    const levels = [...host.querySelectorAll("h1, h2, h3")].map((h) => h.tagName);
+    expect(levels[0]).toBe("H1");
+    expect(levels).not.toContain("H3");
+  });
+
+  it("says under the title that nothing is sent as a notification (shown on phones)", () => {
+    expect($(".as-head-note")!.textContent).toBe("Saved on this device. This page never sends notifications.");
   });
 });

@@ -37,6 +37,8 @@ export default function Home() {
   const focusAfterToggle = useRef<number | null>(null);
   const [removed, setRemoved] = useState<{ item: Reminder; viaKeyboard: boolean } | null>(null);
   const [toastFocused, setToastFocused] = useState(false);
+  // A mouse resting on the toast pauses the countdown too (WCAG 2.2.1), not only keyboard focus.
+  const [toastHovered, setToastHovered] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const textRef = useRef<HTMLInputElement>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
@@ -60,10 +62,10 @@ export default function Home() {
     setItems((current) => toggleDone(current, item.id));
   }
   useEffect(() => {
-    if (!removed || toastFocused) return;
+    if (!removed || toastFocused || toastHovered) return;
     const timer = window.setTimeout(() => setRemoved(null), 6000);
     return () => window.clearTimeout(timer);
-  }, [removed, toastFocused]);
+  }, [removed, toastFocused, toastHovered]);
 
   function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,6 +87,7 @@ export default function Home() {
   function closeToast() {
     setRemoved(null);
     setToastFocused(false);
+    setToastHovered(false);
     textRef.current?.focus();
   }
   function undo() {
@@ -96,6 +99,8 @@ export default function Home() {
   }
 
   const title = LISTS.find((entry) => entry.value === list)!.label;
+  // A time already passed is allowed (catching up on something missed), but say it will be Overdue.
+  const inPast = now !== null && whenValue !== "" && whenValue < now;
 
   return (
     <div className="as">
@@ -104,7 +109,7 @@ export default function Home() {
 
       <div className="as-body">
         <aside className="as-side" aria-label="Lists">
-          <h2>Lists</h2>
+          <p className="as-side-title" aria-hidden="true">Lists</p>
           <ul className="as-lists">
             {LISTS.map(({ value, label, tone }) => (
               <ListButton key={value} label={label} count={countOf(value)} tone={tone} current={list === value} onSelect={() => setList(value)} />
@@ -117,6 +122,7 @@ export default function Home() {
             <div>
               <h1>{title}</h1>
               <p aria-live="polite">{headline(items, now)}</p>
+              <p className="as-head-note">Saved on this device. This page never sends notifications.</p>
             </div>
           </div>
 
@@ -126,7 +132,8 @@ export default function Home() {
                 <input ref={textRef} value={text} onChange={(event) => { if (when === null && whenValue) setWhen(whenValue); setText(event.target.value); }} placeholder="What should you remember?" autoComplete="off" />
               </label>
               <label className="as-field">When
-                <input type="datetime-local" value={whenValue} onChange={(event) => setWhen(event.target.value)} />
+                <input type="datetime-local" value={whenValue} onChange={(event) => setWhen(event.target.value)} aria-describedby={inPast ? "when-hint" : undefined} />
+                {inPast ? <span id="when-hint" className="as-hint">This time has passed, so the reminder will show as Overdue.</span> : null}
               </label>
               <button type="submit" className="as-button" disabled={!text.trim() || !whenValue}>Add</button>
             </div>
@@ -143,8 +150,9 @@ export default function Home() {
                       <span aria-hidden="true" />
                     </label>
                     <div>
-                      <h3>{item.text}</h3>
-                      <p><time dateTime={item.when}>{formatWhen(item.when)}</time></p>
+                      <h2>{item.text}</h2>
+                      {/* The starter list is dated from the clock, so times appear once the clock is known (after hydration). */}
+                      <p>{now === null ? "\u00a0" : <time dateTime={item.when}>{formatWhen(item.when)}</time>}</p>
                     </div>
                     {late ? <Pill tone="red">Overdue</Pill> : item.done ? <Pill tone="grey">Done</Pill> : <Pill tone="green">Open</Pill>}
                     <button type="button" className="as-plain as-danger" aria-label={`Remove ${item.text}`} onClick={(event) => remove(item, event.detail === 0)}>Remove</button>
@@ -177,6 +185,8 @@ export default function Home() {
           role="group"
           aria-label="Undo remove"
           onFocus={() => setToastFocused(true)}
+          onMouseEnter={() => setToastHovered(true)}
+          onMouseLeave={() => setToastHovered(false)}
           onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setToastFocused(false); }}
           onKeyDown={(event) => { if (event.key === "Escape") closeToast(); }}
         >
