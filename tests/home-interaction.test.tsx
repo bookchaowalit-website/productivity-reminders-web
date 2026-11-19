@@ -148,6 +148,38 @@ describe("remove and undo", () => {
   });
 });
 
+describe("batch Undo", () => {
+  it("consecutive removes restore together with one Undo", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 13, 12, 20));
+    press($('[aria-label="Remove Review the next route"]')!, 1);
+    act(() => { vi.advanceTimersByTime(4000); });
+    press($('[aria-label="Remove Ship portfolio batch"]')!, 1);
+    expect(rows()).toEqual([]);
+    expect($(".as-toast span")?.textContent).toBe("Removed 2 reminders");
+    expect(button("Undo").getAttribute("aria-label")).toBe("Undo remove of 2 reminders");
+    // The second removal restarted the 6 s window.
+    act(() => { vi.advanceTimersByTime(4000); });
+    press(button("Undo"), 1);
+    expect(rows()).toEqual(["Ship portfolio batch", "Review the next route"]);
+    expect(stored()).toHaveLength(3);
+    expect($('[role="status"]')?.textContent).toBe("Restored 2 reminders.");
+    expect($(".as-toast")).toBeNull();
+  });
+
+  it("keyboard remove focuses Undo, also for the second removal in a batch, and Escape returns to the field", () => {
+    press($('[aria-label="Remove Review the next route"]')!, 0);
+    expect(document.activeElement).toBe(button("Undo"));
+    // Shift+Tab back to a row and remove it too: focus is on Undo again, now for both.
+    press($('[aria-label="Remove Ship portfolio batch"]')!, 0);
+    expect(document.activeElement).toBe(button("Undo"));
+    expect($(".as-toast span")?.textContent).toBe("Removed 2 reminders");
+    act(() => { $(".as-toast")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(document.activeElement).toBe(textInput());
+    expect(stored()).toHaveLength(1);
+  });
+});
+
 describe("review fixes", () => {
   // The clock subscription starts on mount, so remount after switching to fully fake timers.
   function remountWithFakeTimers(at: Date) {

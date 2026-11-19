@@ -16,6 +16,9 @@ function subscribeClock(listener: () => void) {
 function useNow(): string | null {
   return useSyncExternalStore(subscribeClock, () => toLocalInput(new Date()), () => null);
 }
+// Every removal still inside the Undo window (rows are shown sorted by time, so no position is needed).
+type RemovedBatch = { items: Reminder[]; viaKeyboard: boolean };
+const removedLabel = (items: Reminder[]) => (items.length === 1 ? `Removed “${items[0].text}”` : `Removed ${items.length} reminders`);
 const LISTS: { value: ReminderList; label: string; tone?: Tone }[] = [
   { value: "open", label: "Open", tone: "green" },
   { value: "overdue", label: "Overdue", tone: "red" },
@@ -35,7 +38,11 @@ export default function Home() {
   // cannot jump to the next hour while they are still writing.
   const whenValue = when ?? (now ? nextFullHour(new Date()) : "");
   const focusAfterToggle = useRef<number | null>(null);
-  const [removed, setRemoved] = useState<{ item: Reminder; viaKeyboard: boolean } | null>(null);
+  // One Undo puts back every removal still inside the Undo window.
+  const [removed, setRemovedState] = useState<RemovedBatch | null>(null);
+  // The latest batch, so two removals before a re-render still both land in it.
+  const removedRef = useRef<RemovedBatch | null>(null);
+  const setRemoved = (batch: RemovedBatch | null) => { removedRef.current = batch; setRemovedState(batch); };
   const [toastFocused, setToastFocused] = useState(false);
   // A mouse resting on the toast pauses the countdown too (WCAG 2.2.1), not only keyboard focus.
   const [toastHovered, setToastHovered] = useState(false);
@@ -64,7 +71,8 @@ export default function Home() {
   }
   useEffect(() => {
     if (!removed || toastFocused || toastHovered) return;
-    const timer = window.setTimeout(() => setRemoved(null), 6000);
+    // Each removal makes a new batch object, so the 6 s restart from the latest one.
+    const timer = window.setTimeout(() => { removedRef.current = null; setRemovedState(null); setToastHovered(false); }, 6000);
     return () => window.clearTimeout(timer);
   }, [removed, toastFocused, toastHovered]);
 
@@ -97,8 +105,9 @@ export default function Home() {
   }
   function remove(item: Reminder, viaKeyboard: boolean) {
     setItems((current) => deleteReminder(current, item.id));
-    setRemoved({ item, viaKeyboard });
-    setAnnouncement(`Removed “${item.text}”. Undo is available for a few seconds.`);
+    const batch = [...(removedRef.current?.items ?? []), item];
+    setRemoved({ items: batch, viaKeyboard });
+    setAnnouncement(`${removedLabel(batch)}. Undo is available for a few seconds.`);
   }
   function closeToast() {
     setRemoved(null);
@@ -107,10 +116,10 @@ export default function Home() {
     textRef.current?.focus();
   }
   function undo() {
-    if (!removed) return;
-    const { item } = removed;
-    setItems((current) => restoreReminder(current, item));
-    setAnnouncement(`Restored “${item.text}”.`);
+    const batch = removedRef.current?.items;
+    if (!batch?.length) return;
+    setItems((current) => batch.reduce(restoreReminder, current));
+    setAnnouncement(batch.length === 1 ? `Restored “${batch[0].text}”.` : `Restored ${batch.length} reminders.`);
     closeToast();
   }
 
@@ -209,8 +218,8 @@ export default function Home() {
           onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setToastFocused(false); }}
           onKeyDown={(event) => { if (event.key === "Escape") closeToast(); }}
         >
-          <span>Removed “{removed.item.text}”</span>
-          <button ref={undoRef} type="button" className="as-plain" onClick={undo}>Undo</button>
+          <span>{removedLabel(removed.items)}</span>
+          <button ref={undoRef} type="button" className="as-plain" onClick={undo} aria-label={removed.items.length === 1 ? undefined : `Undo remove of ${removed.items.length} reminders`}>Undo</button>
         </div>
       ) : null}
 
