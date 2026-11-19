@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { AppFoot, AppTop, ListButton, Pill, type Tone } from "@/components/app-shell";
 import { createLocalStore, useLocalStore } from "@/lib/local-store";
 import { STORAGE_KEY, addReminder as addTo, deleteReminder, formatWhen, headline, isOverdue, listView, nextFullHour, parseReminders, restoreReminder, serializeReminders, toLocalInput, toggleDone, type Reminder, type ReminderList } from "@/lib/reminders";
@@ -42,6 +42,7 @@ export default function Home() {
   const [announcement, setAnnouncement] = useState("");
   const textRef = useRef<HTMLInputElement>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
+  const toastRef = useRef<HTMLDivElement>(null);
 
   const visible = useMemo(() => listView(items, list, now), [items, list, now]);
   const countOf = (value: ReminderList) => listView(items, value, now).length;
@@ -66,6 +67,21 @@ export default function Home() {
     const timer = window.setTimeout(() => setRemoved(null), 6000);
     return () => window.clearTimeout(timer);
   }, [removed, toastFocused, toastHovered]);
+
+  // While the toast shows, reserve its height (plus its 24px offset and a gap) at the bottom of the page and in
+  // scroll-padding, so a link or control focused behind it (e.g. the footer, Tab while the pointer rests on the
+  // toast) scrolls clear instead of staying hidden (WCAG 2.4.11). Same pattern as habit-tracker and calendar.
+  const toastShown = removed !== null;
+  useLayoutEffect(() => {
+    const toast = toastRef.current;
+    if (!toastShown || !toast) return;
+    const rootStyle = document.documentElement.style;
+    const reserve = () => rootStyle.setProperty("--as-toast-space", `${toast.offsetHeight + 32}px`);
+    reserve();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(reserve) : null;
+    observer?.observe(toast);
+    return () => { observer?.disconnect(); rootStyle.removeProperty("--as-toast-space"); };
+  }, [toastShown]);
 
   function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -182,6 +198,7 @@ export default function Home() {
       <p className="as-sr" role="status" aria-live="polite">{announcement}</p>
       {removed ? (
         <div
+          ref={toastRef}
           className="as-toast"
           role="group"
           aria-label="Undo remove"

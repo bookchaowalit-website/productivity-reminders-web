@@ -38,6 +38,12 @@ A portfolio visitor, or one person in one browser, who wants a short list of thi
   defaults to UTC, so a caller that omits it gets UTC wall-clock times, which can look past-due elsewhere.
 - **The past-time hint sits under the whole composer**, not directly under the When field, so on phones it appears
   below the Add button; the field still points to it with `aria-describedby`.
+- **Sample times across a DST jump** (Codex, 2026-11-19, accepted): "later today" is the wall clock plus two hours, so
+  in a zone that springs forward in that window (e.g. America/New_York at 00:30 on 8 March 2026) the sample can name a
+  local time that does not exist (02:00) and show as Overdue at once.
+- **MCP `timeZone` checks are loose** (Codex, 2026-11-19, accepted): `timeZone: null` falls back to UTC instead of an
+  error, offsets such as `+07:00` pass because the runtime's `Intl` accepts them, and `arguments: null` returns
+  `-32700` instead of `-32602`.
 
 ## Live URL and deploy state
 

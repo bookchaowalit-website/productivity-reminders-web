@@ -270,4 +270,20 @@ describe("adding from a list that would hide the new reminder", () => {
   it("says under the title that nothing is sent as a notification (shown on phones)", () => {
     expect($(".as-head-note")!.textContent).toBe("Saved on this device. This page never sends notifications.");
   });
+
+  // Codex 2026-11-19: a focused footer link must not sit behind the toast.
+  it("reserves the toast's height at the page bottom and in scroll-padding while it shows, and clears it after", async () => {
+    const root = document.documentElement.style;
+    expect(root.getPropertyValue("--as-toast-space")).toBe("");
+    const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(52);
+    press($('[aria-label="Remove Ship portfolio batch"]')!, 1);
+    expect(root.getPropertyValue("--as-toast-space")).toBe("84px");
+    act(() => { $(".as-toast")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(root.getPropertyValue("--as-toast-space")).toBe("");
+    height.mockRestore();
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync(`${process.cwd()}/app/app-shell.css`, "utf8");
+    expect(css).toContain("html { scroll-padding-top: 64px; scroll-padding-bottom: calc(16px + var(--as-toast-space, 0px)); }");
+    expect(css).toContain(".as { padding-bottom: var(--as-toast-space, 0px); }");
+  });
 });
