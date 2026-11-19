@@ -4,6 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
 
+// Freeze the clock before the page module (and its store's starter list) is created.
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 10, 13, 12, 20));
+});
+
 // Mounted tests for reminders on the App shell. The clock is pinned to 13 Nov 2026 12:20.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -213,12 +219,19 @@ describe("adding from a list that would hide the new reminder", () => {
 
   // 2026-11-18 review round 2.
   it("a first visit starts from sample reminders dated from the clock, none of them overdue", () => {
+    // The page's store builds its starter list when the module loads; the clock was frozen (vi.hoisted above) before that.
     act(() => root.unmount());
     localStorage.clear();
     root = createRoot(host);
     act(() => root.render(<Home />));
     expect([...host.querySelectorAll(".as-pill")].map((p) => p.textContent)).toEqual(["Open", "Open"]);
-    expect($(".as-head p")!.textContent).toMatch(/^Next: Ship portfolio batch · /);
+    expect([...host.querySelectorAll(".as-row time")].map((t) => t.textContent)).toEqual(["Fri 13 Nov 2026 · 14:00", "Sat 14 Nov 2026 · 09:00"]);
+    expect($(".as-head p")!.textContent).toBe("Next: Ship portfolio batch · Fri 13 Nov 2026 · 14:00");
+  });
+
+  it("strikes through done rows, now that row titles are h2", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync(`${process.cwd()}/app/app-shell.css`, "utf8")).toContain('.as-row[data-done="true"] h2, .as-row[data-done="true"] h3 { color: var(--as-muted); text-decoration: line-through; }');
   });
 
   it("warns, linked to the field, when the chosen time has already passed", () => {
@@ -226,6 +239,8 @@ describe("adding from a list that would hide the new reminder", () => {
     type(whenInput(), "2026-11-12T09:00");
     expect($("#when-hint")!.textContent).toBe("This time has passed, so the reminder will show as Overdue.");
     expect(whenInput().getAttribute("aria-describedby")).toBe("when-hint");
+    // Described by the hint, but not named by it: the hint sits outside the When label.
+    expect(whenInput().closest("label")!.contains($("#when-hint"))).toBe(false);
     type(whenInput(), "2026-11-14T09:00");
     expect($("#when-hint")).toBeNull();
   });

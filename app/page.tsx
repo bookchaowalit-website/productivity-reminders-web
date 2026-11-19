@@ -133,10 +133,11 @@ export default function Home() {
               </label>
               <label className="as-field">When
                 <input type="datetime-local" value={whenValue} onChange={(event) => setWhen(event.target.value)} aria-describedby={inPast ? "when-hint" : undefined} />
-                {inPast ? <span id="when-hint" className="as-hint">This time has passed, so the reminder will show as Overdue.</span> : null}
               </label>
               <button type="submit" className="as-button" disabled={!text.trim() || !whenValue}>Add</button>
             </div>
+            {/* Outside the label, so the field's name stays "When"; the warning is only its description. */}
+            {inPast ? <p id="when-hint" className="as-hint">This time has passed, so the reminder will show as Overdue.</p> : null}
           </form>
 
           {visible.length ? (

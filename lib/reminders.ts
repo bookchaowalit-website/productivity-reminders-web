@@ -10,21 +10,47 @@ export const STORAGE_KEY = "reminders-v1";
  * Overdue: one later today (the hour after next), one tomorrow at 09:00, and one handled
  * yesterday. The order (yesterday < later today < tomorrow 09:00) is the same whatever `now` is.
  */
-export function starterReminders(now: Date): Reminder[] {
-  const at = (days: number, hours: number, minutes = 0) => {
-    const date = new Date(now);
-    date.setDate(date.getDate() + days);
-    date.setHours(hours, minutes, 0, 0);
-    return toLocalInput(date);
+export function starterReminders(now: Date, timeZone?: string): Reminder[] {
+  // Work on the wall clock (in `timeZone`, else this device's zone) held in a Date's UTC fields,
+  // so the day and hour arithmetic below never meets a DST jump of the machine running it.
+  const wall = wallClock(now, timeZone);
+  const stamp = (date: Date) => date.toISOString().slice(0, 16);
+  const at = (days: number, hours: number) => {
+    const date = new Date(wall);
+    date.setUTCDate(date.getUTCDate() + days);
+    date.setUTCHours(hours, 0, 0, 0);
+    return stamp(date);
   };
-  const later = new Date(now);
-  later.setMinutes(0, 0, 0);
-  later.setHours(later.getHours() + 2);
+  const later = new Date(wall);
+  later.setUTCMinutes(0, 0, 0);
+  later.setUTCHours(later.getUTCHours() + 2);
   return [
-    { id: "1", text: "Ship portfolio batch", when: toLocalInput(later), done: false },
+    { id: "1", text: "Ship portfolio batch", when: stamp(later), done: false },
     { id: "2", text: "Review the next route", when: at(1, 9), done: false },
     { id: "3", text: "Archive loose notes", when: at(-1, 10), done: true },
   ];
+}
+
+/** True when `timeZone` is an IANA zone name this runtime knows (e.g. "Asia/Bangkok", "UTC"). */
+export function isTimeZone(timeZone: unknown): timeZone is string {
+  if (typeof timeZone !== "string" || !timeZone) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The wall-clock time of `now` (in `timeZone`, else this device's zone) as a Date whose UTC fields hold it. */
+function wallClock(now: Date, timeZone?: string): Date {
+  if (!timeZone) return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes()));
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric" })
+      .formatToParts(now)
+      .map((part) => [part.type, Number(part.value)]),
+  );
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute));
 }
 
 function toReminder(value: unknown): Reminder | null {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { starterReminders, nextOpen, openCount, sanitizeReminders, sortByWhen } from "@/lib/reminders";
+import { isTimeZone, starterReminders, nextOpen, openCount, sanitizeReminders, sortByWhen } from "@/lib/reminders";
 
 // Stateless JSON-RPC MCP endpoint. Reminders live in the visitor's browser (localStorage), so the server
 // cannot read them and never sends notifications: it serves the starter list and orders reminders the caller sends.
@@ -7,7 +7,14 @@ import { starterReminders, nextOpen, openCount, sanitizeReminders, sortByWhen } 
 type RpcRequest = { id?: number | string | null; method?: string; params?: { name?: string; arguments?: Record<string, unknown> } };
 
 const TOOLS = [
-  { name: "get_sample_reminders", description: "The starter reminders a new browser begins with", inputSchema: { type: "object", properties: {} } },
+  {
+    name: "get_sample_reminders",
+    description: "The starter reminders a new browser begins with, dated from now: later today, tomorrow 09:00, and one done yesterday. Times are local datetime strings (no offset) in timeZone",
+    inputSchema: {
+      type: "object",
+      properties: { timeZone: { type: "string", description: "IANA time zone for the local times, e.g. Asia/Bangkok. Default UTC" } },
+    },
+  },
   {
     name: "next_reminder",
     description: "Order the given reminders by time and return the earliest open one; malformed entries are skipped",
@@ -33,7 +40,11 @@ class RpcError extends Error {
 function callTool(name: string | undefined, args: Record<string, unknown> = {}) {
   switch (name) {
     case "get_sample_reminders":
-      return { reminders: starterReminders(new Date()) };
+    {
+      const timeZone = args.timeZone ?? "UTC";
+      if (!isTimeZone(timeZone)) throw new RpcError(-32602, "timeZone must be an IANA time zone name, e.g. Asia/Bangkok");
+      return { timeZone, reminders: starterReminders(new Date(), timeZone) };
+    }
     case "next_reminder": {
       if (!Array.isArray(args.reminders)) throw new RpcError(-32602, "reminders must be an array");
       const reminders = sanitizeReminders(args.reminders);

@@ -161,7 +161,7 @@
 .as-check span { width: 24px; height: 24px; border: 2px solid var(--as-muted); border-radius: 50%; transition: background-color .15s ease, border-color .15s ease; }
 .as-check input:checked + span { border-color: var(--as-button); background: var(--as-button) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center / 16px no-repeat; }
 .as-check:has(input:focus-visible) span { outline: 3px solid var(--as-focus); outline-offset: 2px; }
-.as-row[data-done="true"] h3 { color: var(--as-muted); text-decoration: line-through; }
+.as-row[data-done="true"] h2, .as-row[data-done="true"] h3 { color: var(--as-muted); text-decoration: line-through; }
 .as-chips { display: flex; flex-wrap: wrap; gap: 12px 24px; }
 @media (max-width: 760px) {
   .as-row-check { grid-template-columns: 44px minmax(0, 1fr) auto; }
@@ -175,7 +175,7 @@
 .as-composer-grid { display: grid; grid-template-columns: minmax(0, 260px) auto; justify-content: space-between; align-items: end; gap: 12px; }
 .as-composer-grid > .as-field:first-child { grid-column: 1 / -1; }
 .as-composer-grid input { min-width: 0; }
-.as-hint { color: var(--as-muted); font-size: 13px; font-weight: 400; line-height: 1.4; }
+.as-hint { margin: 0; color: var(--as-muted); font-size: 13px; font-weight: 400; line-height: 1.4; }
 /* Phones hide the top-bar tagline, so the no-notifications line sits under the title there; desktop shows the tagline. */
 @media (min-width: 761px) { .as-head-note { display: none; } }
 @media (max-width: 760px) { .as-composer-grid { grid-template-columns: 1fr; } .as-composer-grid .as-button { width: 100%; } }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/mcp/route";
 import { starterReminders } from "@/lib/reminders";
 
@@ -17,10 +17,38 @@ describe("MCP route", () => {
     expect(result.tools.map((t: { name: string }) => t.name)).toEqual(["get_sample_reminders", "next_reminder"]);
   });
 
-  it("get_sample_reminders returns the starter list the page begins with", async () => {
-    const res = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "get_sample_reminders" } });
-    const { reminders } = (await res.json()).result;
-    expect(reminders.map((r: { text: string }) => r.text)).toEqual(starterReminders(new Date()).map((r) => r.text));
+  // 2026-11-19 Codex review: the samples used the server's zone; now the caller picks one (default UTC).
+  describe("get_sample_reminders", () => {
+    beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-19T04:00:00Z")); });
+    afterEach(() => vi.useRealTimers());
+    const call = (args?: Record<string, unknown>) =>
+      rpc({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "get_sample_reminders", ...(args ? { arguments: args } : {}) } }).then((res) => res.json());
+
+    it("defaults to UTC local times", async () => {
+      const { result } = await call();
+      expect(result.timeZone).toBe("UTC");
+      expect(result.reminders.map((r: { when: string }) => r.when)).toEqual(["2026-11-19T06:00", "2026-11-20T09:00", "2026-11-18T10:00"]);
+    });
+
+    it("builds the local times in the caller's IANA time zone", async () => {
+      const { result } = await call({ timeZone: "Asia/Bangkok" });
+      // 04:00 UTC is 11:00 in Bangkok: later today is 13:00 there, not an already-passed 06:00.
+      expect(result.reminders.map((r: { when: string }) => r.when)).toEqual(["2026-11-19T13:00", "2026-11-20T09:00", "2026-11-18T10:00"]);
+      expect(result.reminders).toEqual(starterReminders(new Date(), "Asia/Bangkok"));
+    });
+
+    it.each(["Mars/Olympus", "", 7])("rejects an invalid timeZone %s", async (timeZone) => {
+      const body = await call({ timeZone });
+      expect(body.error.code).toBe(-32602);
+      expect(body.error.message).toMatch(/IANA time zone/);
+    });
+
+    it("documents the optional timeZone argument in the tool schema", async () => {
+      const { result } = await (await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })).json();
+      const tool = result.tools.find((t: { name: string }) => t.name === "get_sample_reminders");
+      expect(tool.inputSchema.properties.timeZone.type).toBe("string");
+      expect(tool.inputSchema.required).toBeUndefined();
+    });
   });
 
   it("next_reminder picks the earliest open reminder from the ones it is given", async () => {

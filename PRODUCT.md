@@ -31,6 +31,14 @@ A portfolio visitor, or one person in one browser, who wants a short list of thi
 - No account, sync or export. Clearing site data removes everything.
 - No product analytics beyond Vercel Analytics.
 
+## Known limits
+
+- **Sample reminders follow a clock.** The page dates them from the visitor's device clock and zone when the page
+  loads (times appear after hydration). The MCP tool `get_sample_reminders` takes an optional IANA `timeZone` and
+  defaults to UTC, so a caller that omits it gets UTC wall-clock times, which can look past-due elsewhere.
+- **The past-time hint sits under the whole composer**, not directly under the When field, so on phones it appears
+  below the Add button; the field still points to it with `aria-describedby`.
+
 ## Live URL and deploy state
 
 - Live: https://reminders.bookchaowalit.com (HTTP 200 on 2026-10-23).
