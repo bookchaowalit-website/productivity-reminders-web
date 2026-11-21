@@ -275,6 +275,7 @@ describe("adding from a list that would hide the new reminder", () => {
     expect(whenInput().getAttribute("aria-describedby")).toBe("when-hint");
     // Described by the hint, but not named by it: the hint sits outside the When label.
     expect(whenInput().closest("label")!.contains($("#when-hint"))).toBe(false);
+    expect(whenInput().closest(".as-when-field")!.lastElementChild).toBe($("#when-hint"));
     type(whenInput(), "2026-11-14T09:00");
     expect($("#when-hint")!.textContent).toBe("");
   });
