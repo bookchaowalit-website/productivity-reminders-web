@@ -156,14 +156,15 @@ export default function Home() {
               <label className="as-field">Reminder
                 <input ref={textRef} value={text} onChange={(event) => { if (when === null && whenValue) setWhen(whenValue); setText(event.target.value); }} placeholder="What should you remember?" autoComplete="off" />
               </label>
-              <label className="as-field">When
-                <input type="datetime-local" value={whenValue} onChange={(event) => setWhen(event.target.value)} aria-describedby="when-hint" />
-              </label>
+              <div className="as-when-field">
+                <label className="as-field">When
+                  <input type="datetime-local" value={whenValue} onChange={(event) => setWhen(event.target.value)} aria-describedby="when-hint" />
+                </label>
+                {/* Keep the live warning beside When, outside the label so it stays its description. */}
+                <p id="when-hint" className="as-hint" aria-live="polite">{inPast ? "This time has passed, so the reminder will show as Overdue." : ""}</p>
+              </div>
               <button type="submit" className="as-button" disabled={!text.trim() || !whenValue}>Add</button>
             </div>
-            {/* Outside the label, so the field's name stays "When"; the warning is only its description. */}
-            {/* Always in the DOM as a polite live region, so the warning is announced while focus stays in When. */}
-            <p id="when-hint" className="as-hint" aria-live="polite">{inPast ? "This time has passed, so the reminder will show as Overdue." : ""}</p>
           </form>
 
           {visible.length ? (

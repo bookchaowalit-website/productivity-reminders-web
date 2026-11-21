@@ -174,8 +174,9 @@
    (On one row the date-time picker's fixed width squeezed the message box to a few letters.) */
 .as-composer-grid { display: grid; grid-template-columns: minmax(0, 260px) auto; justify-content: space-between; align-items: end; gap: 12px; }
 .as-composer-grid > .as-field:first-child { grid-column: 1 / -1; }
+.as-when-field { min-width: 0; }
 .as-composer-grid input { min-width: 0; }
-.as-hint { margin: 0; color: var(--as-muted); font-size: 13px; font-weight: 400; line-height: 1.4; }
+.as-hint { margin: 6px 0 0; color: var(--as-muted); font-size: 13px; font-weight: 400; line-height: 1.4; }
 /* Phones hide the top-bar tagline, so the no-notifications line sits under the title there; desktop shows the tagline. */
 @media (min-width: 761px) { .as-head-note { display: none; } }
 @media (max-width: 760px) { .as-composer-grid { grid-template-columns: 1fr; } .as-composer-grid .as-button { width: 100%; } }
